@@ -8,16 +8,45 @@ interface ArabicTextProps {
 const ArabicText: React.FC<ArabicTextProps> = ({ content, className }) => {
     if (!content) return null;
 
+    // Helper to unescape HTML entities if they exist
+    const unescapeHtml = (str: string) => {
+        return str
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&amp;/g, "&");
+    };
+
+    const decodedContent = unescapeHtml(content);
+
+    // Helper to convert English numerals to Arabic numerals
+    const toArabicNumerals = (str: string) => {
+        const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        return str.replace(/[0-9]/g, (w) => arabicNumerals[+w]);
+    };
+
+    // Helper to safely convert numerals in HTML string
+    const convertHtmlNumerals = (html: string) => {
+        // Regex to match text content: >text<
+        // This ensures we don't mess up attributes or tags
+        return html.replace(/>([^<]+)</g, (match, textContent) => {
+            // Reconstruct the match with converted text
+            const convertedText = toArabicNumerals(textContent);
+            return `>${convertedText}<`;
+        });
+    };
+
     // Check if content looks like HTML (basic check)
     // Tiptap usually wraps content in <p> or other tags.
-    const isHtml = /<\/?[a-z][\s\S]*>/i.test(content);
+    const isHtml = /<\/?[a-z][\s\S]*>/i.test(decodedContent);
 
     if (isHtml) {
         return (
             <div
                 className={`prose prose-lg max-w-none text-right font-arabic leading-loose ${className || ''}`}
                 style={{ fontFamily: 'var(--font-arabic)', direction: 'rtl' }}
-                dangerouslySetInnerHTML={{ __html: content }}
+                dangerouslySetInnerHTML={{ __html: convertHtmlNumerals(decodedContent) }}
             />
         );
     }
@@ -40,7 +69,7 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className }) => {
                 }
 
                 // Parse formatting within paragraph
-                const parts = parseFormatting(paragraph);
+                const parts = parseFormatting(toArabicNumerals(paragraph));
 
                 return (
                     <p key={pIndex} className="font-arabic rtl text-2xl leading-loose text-right">
