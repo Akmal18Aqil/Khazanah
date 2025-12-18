@@ -1,6 +1,13 @@
-import Link from 'next/link'
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { stripHtml } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import ArabicText from '@/components/ArabicText'
 
 interface FiqhEntry {
   id: string
@@ -21,69 +28,139 @@ interface FiqhCardProps {
 }
 
 export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
-  const href = searchQuery
-    ? `/entry/${entry.id}?q=${encodeURIComponent(searchQuery)}`
-    : `/entry/${entry.id}`
+  const router = useRouter()
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const handleCardClick = () => {
+    const href = searchQuery
+      ? `/entry/${entry.id}?q=${encodeURIComponent(searchQuery)}`
+      : `/entry/${entry.id}`
+    router.push(href)
+  }
+
+  const toggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsExpanded(!isExpanded)
+  }
+
+  // Helper function for highlighting text
+  const highlightText = (text: string, query?: string) => {
+    if (!query || !text) return text;
+
+    // Normalize text and query to NFC
+    const normalizedText = text.normalize('NFC');
+    const normalizedQuery = query.normalize('NFC');
+
+    const terms = normalizedQuery.split(/\s+/).filter(t => t.length > 0).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (terms.length === 0) return text;
+
+    const regex = new RegExp(`(${terms.join('|')})`, 'gi');
+    const checkRegex = new RegExp(`^(${terms.join('|')})$`, 'i');
+
+    return normalizedText.split(regex).map((part, i) =>
+      checkRegex.test(part) ? (
+        <span key={i} className="text-red-500 font-bold bg-yellow-100/50 dark:bg-yellow-900/30 rounded px-0.5">{part}</span>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
+  };
 
   return (
-    <Link href={href}>
-      <Card className="hover:shadow-md transition-shadow cursor-pointer mb-6">
-        <CardHeader>
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-xl line-clamp-2">{entry.title}</CardTitle>
-            <Badge variant={entry.entry_type === 'ibarat' ? 'default' : 'secondary'}>
-              {entry.entry_type}
-            </Badge>
-          </div>
-          {entry.question_text && (
-            <CardDescription className="line-clamp-2">
-              {entry.question_text}
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div>
-              <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                Ringkasan Jawaban:
-              </h4>
-              <p className="text-sm line-clamp-3">{entry.answer_summary}</p>
+    <Card
+      onClick={handleCardClick}
+      className="hover:shadow-md transition-shadow cursor-pointer mb-6 relative group"
+    >
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-xl line-clamp-2 leading-relaxed">
+            {highlightText(entry.title, searchQuery)}
+          </CardTitle>
+          <Badge variant={entry.entry_type === 'ibarat' ? 'default' : 'secondary'} className="shrink-0">
+            {entry.entry_type}
+          </Badge>
+        </div>
+        {entry.question_text && (
+          <CardDescription className="line-clamp-2">
+            {highlightText(entry.question_text, searchQuery)}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900/50">
+            <h4 className="font-semibold text-sm text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide flex items-center gap-2">
+              <span className="w-1 h-4 bg-blue-600 dark:bg-blue-400 rounded-full inline-block"></span>
+              Ringkasan Jawaban
+            </h4>
+
+            <div className={`prose prose-sm dark:prose-invert max-w-none text-foreground ${isExpanded ? "" : "line-clamp-3"}`}>
+              <p className="leading-relaxed">
+                {highlightText(entry.answer_summary, searchQuery)}
+              </p>
             </div>
-
-            {entry.ibarat_text && (
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                  Ibarat:
-                </h4>
-                <p className="text-sm font-arabic rtl line-clamp-2">
-                  {entry.ibarat_text}
-                </p>
-              </div>
-            )}
-
-            {entry.musyawarah_source && (
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                  Sumber Musyawarah:
-                </h4>
-                <p className="text-sm text-muted-foreground">{entry.musyawarah_source}</p>
-              </div>
-            )}
-
-            {entry.source_kitab && (
-              <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                  Kitab:
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  {entry.source_kitab}
-                  {entry.source_details && ` - ${entry.source_details}`}
-                </p>
-              </div>
-            )}
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+
+
+          {entry.ibarat_text && (
+            <div>
+              <h4 className="font-semibold text-sm text-green-600 dark:text-green-500 mb-3 uppercase tracking-wide flex items-center gap-2">
+                {/* <span className="w-1 h-4 bg-green-600 dark:bg-green-500 rounded-full inline-block"></span> */}
+                Teks kitab kuning (Ibarat)
+              </h4>
+              <div className={`text-lg text-right ${isExpanded ? "" : "max-h-[100px] overflow-hidden mask-linear-fade"}`}>
+                <ArabicText content={entry.ibarat_text} className={isExpanded ? "" : ""} highlight={searchQuery} />
+              </div>
+            </div>
+          )}
+
+          {isExpanded && (
+            <div className="animate-in fade-in zoom-in duration-300 space-y-3 pt-2">
+              {entry.musyawarah_source && (
+                <div>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                    Sumber Musyawarah:
+                  </h4>
+                  <p className="text-sm text-muted-foreground">{entry.musyawarah_source}</p>
+                </div>
+              )}
+
+              {entry.source_kitab && (
+                <div>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                    Kitab:
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {entry.source_kitab}
+                    {entry.source_details && ` - ${entry.source_details}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleExpand}
+              className="gap-1 hover:bg-muted z-10"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Sembunyikan
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Lihat Detail
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

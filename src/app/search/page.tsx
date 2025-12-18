@@ -76,10 +76,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-center mb-8">
-            Hasil Pencarian: "{query}"
-          </h1>
-          <SearchComponent initialQuery={query} />
+
+          <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-4 -mx-4 px-4 border-b mb-8 shadow-sm">
+            <div className="max-w-4xl mx-auto">
+              <h1 className="text-xl font-bold text-center mb-4 truncate">
+                Hasil Pencarian: "{query}"
+              </h1>
+              <SearchComponent initialQuery={query} />
+            </div>
+          </div>
 
           {results && results.length > 0 ? (
             <div className="mt-8 space-y-8">
