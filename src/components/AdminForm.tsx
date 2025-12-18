@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm, useFieldArray } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { fiqhEntrySchema, type FiqhEntryValues } from '@/lib/schemas'
+import { createEntry, updateEntry } from '@/app/actions/entry'
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import ArabicText from '@/components/ArabicText'
@@ -10,8 +15,18 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, ArrowLeft, Plus, Trash2, Bold, Italic } from 'lucide-react'
+import { Loader2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import TiptapEditor from '@/components/TiptapEditor'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface SourceBook {
   id?: string
@@ -38,128 +53,81 @@ interface AdminFormProps {
 
 export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState('')
 
-  // Normalize source_books dari entry
-  const normalizeSourceBooks = (books: any): SourceBook[] => {
-    if (!books) return [{ kitab_name: '', details: '', order_index: 0 }]
-    if (!Array.isArray(books)) return [{ kitab_name: '', details: '', order_index: 0 }]
-    if (books.length === 0) return [{ kitab_name: '', details: '', order_index: 0 }]
-
-    return books.map((book: any) => ({
-      id: book.id,
-      kitab_name: book.kitab_name || '',
-      details: book.details || '',
-      order_index: book.order_index ?? 0
-    }))
-  }
-
-  const [formData, setFormData] = useState<FiqhEntry>({
+  // Transform entry data to match FiqhEntryValues
+  const defaultValues: Partial<FiqhEntryValues> = {
     title: entry?.title || '',
     question_text: entry?.question_text || '',
     answer_summary: entry?.answer_summary || '',
     ibarat_text: entry?.ibarat_text || '',
-    source_books: normalizeSourceBooks(entry?.source_books),
     musyawarah_source: entry?.musyawarah_source || '',
     entry_type: entry?.entry_type || 'ibarat',
+    source_books: entry?.source_books?.map(book => ({
+      id: book.id,
+      kitab_name: book.kitab_name,
+      details: book.details || '',
+      order_index: book.order_index
+    })) || [{ kitab_name: '', details: '', order_index: 0 }],
+  }
+
+  const form = useForm<FiqhEntryValues>({
+    resolver: zodResolver(fiqhEntrySchema),
+    defaultValues,
+    mode: 'onChange',
   })
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const url = isEdit ? `/api/admin/entries/${entry?.id}` : '/api/admin/entries'
-      const method = isEdit ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+  // Reset form when entry changes (unlikely in this context but good practice)
+  useEffect(() => {
+    if (entry) {
+      form.reset({
+        title: entry.title || '',
+        question_text: entry.question_text || '',
+        answer_summary: entry.answer_summary || '',
+        ibarat_text: entry.ibarat_text || '',
+        musyawarah_source: entry.musyawarah_source || '',
+        entry_type: entry.entry_type || 'ibarat',
+        source_books: entry.source_books?.map(book => ({
+          id: book.id,
+          kitab_name: book.kitab_name,
+          details: book.details || '',
+          order_index: book.order_index
+        })) || [{ kitab_name: '', details: '', order_index: 0 }],
       })
-
-      if (response.ok) {
-        router.push('/admin')
-      } else {
-        const errorData = await response.json()
-        setError(errorData.error || 'Terjadi kesalahan')
-      }
-    } catch (error) {
-      setError('Terjadi kesalahan. Silakan coba lagi.')
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [entry, form])
 
-  const handleInputChange = (field: keyof FiqhEntry, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'source_books',
+  })
 
-  const handleSourceBookChange = (index: number, field: keyof SourceBook, value: string) => {
-    setFormData(prev => {
-      const newSourceBooks = [...(prev.source_books || [])]
-      newSourceBooks[index] = {
-        ...newSourceBooks[index],
-        [field]: field === 'order_index' ? parseInt(value) : value
-      }
-      return {
-        ...prev,
-        source_books: newSourceBooks
+  const onSubmit = async (data: FiqhEntryValues) => {
+    setError('')
+    startTransition(async () => {
+      try {
+        let result
+        if (isEdit && entry?.id) {
+          result = await updateEntry(entry.id, data)
+        } else {
+          result = await createEntry(data)
+        }
+
+        if (result.error) {
+          setError(result.error)
+        } else {
+          router.push('/admin')
+          router.refresh()
+        }
+      } catch (err) {
+        setError('Terjadi kesalahan yang tidak diketahui.')
       }
     })
   }
 
-  const addSourceBook = () => {
-    setFormData(prev => ({
-      ...prev,
-      source_books: [
-        ...(prev.source_books || []),
-        {
-          kitab_name: '',
-          details: '',
-          order_index: (prev.source_books?.length || 0)
-        }
-      ]
-    }))
-  }
 
-  const removeSourceBook = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      source_books: (prev.source_books || []).filter((_, i) => i !== index)
-    }))
-  }
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const handleFormat = (prefix: string, suffix: string) => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const text = textarea.value
-    const before = text.substring(0, start)
-    const selected = text.substring(start, end)
-    const after = text.substring(end)
-
-    const newText = before + prefix + selected + suffix + after
-
-    handleInputChange('ibarat_text', newText)
-
-    // Restore styling focus
-    setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(start + prefix.length, end + prefix.length)
-    }, 0)
-  }
+  const watchedIbarat = form.watch('ibarat_text')
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -188,224 +156,220 @@ export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">Judul/Topik Masalah *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  placeholder="contoh: Hukum Asuransi Jiwa"
-                  required
-                  disabled={isLoading}
+              <div className="grid md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Judul/Topik Masalah *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="contoh: Hukum Asuransi Jiwa" {...field} disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="entry_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipe Entri *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        disabled={isPending}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih tipe entri" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="ibarat">Ibarat</SelectItem>
+                          <SelectItem value="rumusan">Rumusan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="entry_type">Tipe Entri *</Label>
-                <Select
-                  value={formData.entry_type}
-                  onValueChange={(value) => handleInputChange('entry_type', value as 'rumusan' | 'ibarat')}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tipe entri" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ibarat">Ibarat</SelectItem>
-                    <SelectItem value="rumusan">Rumusan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="question_text">Teks Pertanyaan (Opsional)</Label>
-              <Textarea
-                id="question_text"
-                value={formData.question_text}
-                onChange={(e) => handleInputChange('question_text', e.target.value)}
-                placeholder="Deskripsi singkat masalah yang dibahas"
-                rows={3}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="answer_summary">Ringkasan Jawaban *</Label>
-              <Textarea
-                id="answer_summary"
-                value={formData.answer_summary}
-                onChange={(e) => handleInputChange('answer_summary', e.target.value)}
-                placeholder="Teks jawaban/rumusan dalam Bahasa Indonesia"
-                rows={6}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ibarat_text">Teks Ibarat *</Label>
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 mb-2 flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-medium text-muted-foreground mr-2">Format:</span>
-
-                <Button
-                  type="button" variant="outline" size="sm" className="h-7 text-xs gap-1 text-red-600 font-bold bg-white"
-                  onClick={() => handleFormat('[', ']')}
-                  title="Referensi Kitab (Merah & Tebal)"
-                >
-                  [ Ref ]
-                </Button>
-
-                <Button
-                  type="button" variant="outline" size="sm" className="h-7 w-7 p-0 bg-white"
-                  onClick={() => handleFormat('**', '**')}
-                  title="Tebal (Bold)"
-                >
-                  <Bold className="w-3 h-3" />
-                </Button>
-
-                <Button
-                  type="button" variant="outline" size="sm" className="h-7 w-7 p-0 bg-white"
-                  onClick={() => handleFormat('*', '*')}
-                  title="Miring (Italic)"
-                >
-                  <Italic className="w-3 h-3" />
-                </Button>
-
-                <div className="w-px h-4 bg-slate-300 mx-1" />
-
-                <Button
-                  type="button" variant="outline" size="sm" className="h-7 px-2 text-xs bg-white font-mono"
-                  onClick={() => handleFormat('\n***\n', '')}
-                  title="Separator Tengah"
-                >
-                  ***
-                </Button>
-              </div>
-              <Textarea
-                ref={textareaRef}
-                id="ibarat_text"
-                value={formData.ibarat_text}
-                onChange={(e) => handleInputChange('ibarat_text', e.target.value)}
-                placeholder="Teks ibarat dalam Bahasa Arab..."
-                rows={6}
-                required
-                disabled={isLoading}
-                className="font-arabic rtl text-right"
-                style={{ fontFamily: 'var(--font-arabic)' }}
+              <FormField
+                control={form.control}
+                name="question_text"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Teks Pertanyaan (Opsional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Deskripsi singkat masalah yang dibahas"
+                        rows={3}
+                        {...field}
+                        disabled={isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
 
-              {formData.ibarat_text && (
+              <FormField
+                control={form.control}
+                name="answer_summary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ringkasan Jawaban *</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Teks jawaban/rumusan dalam Bahasa Indonesia"
+                        rows={6}
+                        {...field}
+                        disabled={isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ibarat_text"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Teks Ibarat *</FormLabel>
+                    <FormControl>
+                      <TiptapEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isPending}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {watchedIbarat && (
                 <div className="mt-4 border rounded-lg p-4 bg-white/50">
                   <Label className="mb-2 block text-muted-foreground">Preview Hasil:</Label>
-                  <ArabicText content={formData.ibarat_text} />
+                  <ArabicText content={watchedIbarat} />
                 </div>
               )}
-            </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Sumber Kitab (Opsional)</Label>
-                  <p className="text-sm text-muted-foreground mt-1">Tambahkan satu atau lebih sumber kitab beserta detailnya</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addSourceBook}
-                  disabled={isLoading}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Tambah Kitab
-                </Button>
-              </div>
-
-              <div className="space-y-4 bg-slate-50 p-4 rounded-lg">
-                {(formData.source_books && formData.source_books.length > 0) ? (
-                  formData.source_books.map((book, index) => (
-                    <div key={index} className="space-y-3 p-4 bg-white border rounded-lg relative">
-                      <div className="absolute top-2 right-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeSourceBook(index)}
-                          disabled={isLoading}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor={`kitab_name_${index}`} className="text-sm">
-                          Nama Kitab {index + 1}
-                        </Label>
-                        <Input
-                          id={`kitab_name_${index}`}
-                          value={book.kitab_name}
-                          onChange={(e) => handleSourceBookChange(index, 'kitab_name', e.target.value)}
-                          placeholder="contoh: Fathul Mu'in atau I'anatut Thalibin"
-                          disabled={isLoading}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor={`details_${index}`} className="text-sm">
-                          Detail Sumber
-                        </Label>
-                        <Input
-                          id={`details_${index}`}
-                          value={book.details || ''}
-                          onChange={(e) => handleSourceBookChange(index, 'details', e.target.value)}
-                          placeholder="contoh: Bab Buyu', Hal. 50"
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground bg-white border border-dashed rounded-lg">
-                    Belum ada sumber kitab. Klik "Tambah Kitab" untuk menambahkan.
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Sumber Kitab (Opsional)</FormLabel>
+                    <FormDescription>Tambahkan satu atau lebih sumber kitab beserta detailnya</FormDescription>
                   </div>
-                )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ kitab_name: '', details: '', order_index: fields.length })}
+                    disabled={isPending}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Tambah Kitab
+                  </Button>
+                </div>
+
+                <div className="space-y-4 bg-slate-50 p-4 rounded-lg">
+                  {fields.length > 0 ? (
+                    fields.map((field, index) => (
+                      <div key={field.id} className="space-y-3 p-4 bg-white border rounded-lg relative">
+                        <div className="absolute top-2 right-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => remove(index)}
+                            disabled={isPending}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name={`source_books.${index}.kitab_name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm">Nama Kitab {index + 1}</FormLabel>
+                              <FormControl>
+                                <Input placeholder="contoh: Fathul Mu'in" {...field} disabled={isPending} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`source_books.${index}.details`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm">Detail Sumber</FormLabel>
+                              <FormControl>
+                                <Input placeholder="contoh: Bab Buyu', Hal. 50" {...field} disabled={isPending} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground bg-white border border-dashed rounded-lg">
+                      Belum ada sumber kitab. Klik "Tambah Kitab" untuk menambahkan.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="musyawarah_source">Sumber Musyawarah (Opsional)</Label>
-              <Input
-                id="musyawarah_source"
-                value={formData.musyawarah_source}
-                onChange={(e) => handleInputChange('musyawarah_source', e.target.value)}
-                placeholder="contoh: LBMNU Jatim, 2023 atau Muktamar NU ke-31"
-                disabled={isLoading}
+              <FormField
+                control={form.control}
+                name="musyawarah_source"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sumber Musyawarah (Opsional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="contoh: LBMNU Jatim, 2023" {...field} disabled={isPending} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="flex gap-4">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isEdit ? 'Perbarui Entri' : 'Simpan Entri'}
-              </Button>
-              <Link href="/admin">
-                <Button type="button" variant="outline">
-                  Batal
+              <div className="flex gap-4">
+                <Button type="submit" disabled={isPending}>
+                  {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isEdit ? 'Perbarui Entri' : 'Simpan Entri'}
                 </Button>
-              </Link>
-            </div>
-          </form>
+                <Link href="/admin">
+                  <Button type="button" variant="outline">
+                    Batal
+                  </Button>
+                </Link>
+              </div>
+            </form>
+          </Form>
         </CardContent>
       </Card>
-    </div>
+    </div >
   )
 }

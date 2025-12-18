@@ -8,7 +8,21 @@ interface ArabicTextProps {
 const ArabicText: React.FC<ArabicTextProps> = ({ content, className }) => {
     if (!content) return null;
 
-    // Split content into paragraphs
+    // Check if content looks like HTML (basic check)
+    // Tiptap usually wraps content in <p> or other tags.
+    const isHtml = /<\/?[a-z][\s\S]*>/i.test(content);
+
+    if (isHtml) {
+        return (
+            <div
+                className={`prose prose-lg max-w-none text-right font-arabic leading-loose ${className || ''}`}
+                style={{ fontFamily: 'var(--font-arabic)', direction: 'rtl' }}
+                dangerouslySetInnerHTML={{ __html: content }}
+            />
+        );
+    }
+
+    // LEGACY: Split content into paragraphs for markdown-like parsing
     const paragraphs = content.split('\n').filter((p) => p.trim() !== '');
 
     return (
@@ -64,7 +78,7 @@ const parseFormatting = (text: string): React.ReactNode[] => {
             // Red and Bold Reference
             elements.push(
                 <span key={index} className="text-red-600 font-bold">
-                    {part}
+                    {part.slice(1, -1)}
                 </span>
             );
         } else if (part.startsWith('**') && part.endsWith('**')) {
