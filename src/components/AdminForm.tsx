@@ -213,11 +213,11 @@ export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
                   <FormItem>
                     <FormLabel>Teks Pertanyaan (Opsional)</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Deskripsi singkat masalah yang dibahas"
-                        rows={3}
-                        {...field}
+                      <TiptapEditor
+                        value={field.value || ''}
+                        onChange={field.onChange}
                         disabled={isPending}
+                        mode="standard"
                       />
                     </FormControl>
                     <FormMessage />

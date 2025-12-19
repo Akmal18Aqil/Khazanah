@@ -117,9 +117,10 @@ export default async function EntryDetailPage({ params, searchParams }: EntryDet
                   <Users className="w-5 h-5" />
                   Pertanyaan
                 </h3>
-                <p className=" leading-relaxed whitespace-pre-wrap">
-                  {entryWithBooks.question_text}
-                </p>
+                <div
+                  className="leading-relaxed whitespace-pre-wrap prose max-w-none dark:prose-invert"
+                  dangerouslySetInnerHTML={{ __html: entryWithBooks.question_text }}
+                />
               </div>
             )}
 

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { stripHtml } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import ArabicText from '@/components/ArabicText'
+import ArabicText, { getHighlightRegex } from '@/components/ArabicText'
 
 interface FiqhEntry {
   id: string
@@ -42,6 +42,67 @@ export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
     e.stopPropagation()
     setIsExpanded(!isExpanded)
   }
+
+  // Helper function for getting snippet
+  const getSnippet = (htmlContent: string, query?: string) => {
+    if (!query || !htmlContent) return htmlContent;
+
+    // Strip HTML tags for processing text matching
+    const text = stripHtml(htmlContent);
+
+    let firstMatchIndex = -1;
+
+    // 1. Try Arabic Regex Match
+    const arabicRegexes = getHighlightRegex(query);
+    if (arabicRegexes) {
+      const match = arabicRegexes.loopRegex.exec(text);
+      if (match) {
+        firstMatchIndex = match.index;
+        console.log('Arabic match found at:', firstMatchIndex, 'Query:', query);
+      }
+    }
+
+    // 2. Fallback to Simple Normalization Match if no Arabic match
+    if (firstMatchIndex === -1) {
+      const normalizedText = text.normalize('NFC').toLowerCase();
+      const normalizedQuery = query.normalize('NFC').toLowerCase();
+      const terms = normalizedQuery.split(/\s+/).filter(t => t.length > 0);
+
+      for (const term of terms) {
+        const idx = normalizedText.indexOf(term);
+        if (idx !== -1) {
+          console.log('Simple match found for term:', term, 'at:', idx);
+          if (firstMatchIndex === -1 || idx < firstMatchIndex) {
+            firstMatchIndex = idx;
+          }
+        }
+      }
+    }
+
+    if (firstMatchIndex === -1) {
+      console.log('No match found for query:', query);
+      return text;
+    }
+
+    // Calculate window
+    const contextBefore = 60;
+    const contextAfter = 140; // Total ~200 chars
+
+    let start = Math.max(0, firstMatchIndex - contextBefore);
+    let end = Math.min(text.length, firstMatchIndex + contextAfter);
+
+    // Adjust to word boundaries
+    if (start > 0) {
+      const spaceIdx = text.indexOf(' ', start);
+      if (spaceIdx !== -1 && spaceIdx < firstMatchIndex) start = spaceIdx + 1;
+    }
+
+    let snippet = text.slice(start, end);
+    if (start > 0) snippet = '... ' + snippet;
+    if (end < text.length) snippet = snippet + ' ...';
+
+    return snippet;
+  };
 
   // Helper function for highlighting text
   const highlightText = (text: string, query?: string) => {
@@ -81,9 +142,9 @@ export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
           </Badge>
         </div>
         {entry.question_text && (
-          <CardDescription className="line-clamp-2">
-            {highlightText(entry.question_text, searchQuery)}
-          </CardDescription>
+          <div className="text-sm text-muted-foreground line-clamp-2">
+            {highlightText(getSnippet(entry.question_text, searchQuery), searchQuery)}
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -96,7 +157,7 @@ export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
 
             <div className={`prose prose-sm dark:prose-invert max-w-none text-foreground ${isExpanded ? "" : "line-clamp-3"}`}>
               <p className="leading-relaxed">
-                {highlightText(entry.answer_summary, searchQuery)}
+                {highlightText(isExpanded ? entry.answer_summary : getSnippet(entry.answer_summary, searchQuery), searchQuery)}
               </p>
             </div>
           </div>
@@ -109,7 +170,7 @@ export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
                 Teks kitab kuning (Ibarat)
               </h4>
               <div className={`text-lg text-right ${isExpanded ? "" : "max-h-[100px] overflow-hidden mask-linear-fade"}`}>
-                <ArabicText content={entry.ibarat_text} className={isExpanded ? "" : ""} highlight={searchQuery} />
+                <ArabicText content={isExpanded ? entry.ibarat_text : getSnippet(entry.ibarat_text, searchQuery)} className={isExpanded ? "" : ""} highlight={searchQuery} />
               </div>
             </div>
           )}

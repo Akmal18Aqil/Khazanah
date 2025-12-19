@@ -7,16 +7,19 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
-import { Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, AlignCenter, AlignRight } from 'lucide-react'
+import { Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, AlignCenter, AlignRight, AlignLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface TiptapEditorProps {
     value: string
     onChange: (value: string) => void
     disabled?: boolean
+    mode?: 'arabic' | 'standard' // Default to 'arabic' for backward compatibility
 }
 
-const TiptapEditor = ({ value, onChange, disabled }: TiptapEditorProps) => {
+const TiptapEditor = ({ value, onChange, disabled, mode = 'arabic' }: TiptapEditorProps) => {
+    const isArabic = mode === 'arabic'
+
     const editor = useEditor({
         immediatelyRender: false,
         extensions: [
@@ -29,16 +32,16 @@ const TiptapEditor = ({ value, onChange, disabled }: TiptapEditorProps) => {
             Underline,
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
-                alignments: ['right', 'center', 'left', 'justify'],
-                defaultAlignment: 'right', // Default to right for Arabic
+                alignments: ['left', 'center', 'right', 'justify'],
+                defaultAlignment: isArabic ? 'right' : 'left',
             }),
         ],
         content: value,
         editable: !disabled,
         editorProps: {
             attributes: {
-                class: 'min-h-[200px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-2xl font-arabic leading-loose ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 rtl text-right',
-                style: 'font-family: var(--font-arabic);'
+                class: `min-h-[200px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${isArabic ? 'text-2xl font-arabic leading-loose rtl text-right' : 'text-sm text-left'}`,
+                style: isArabic ? 'font-family: var(--font-arabic);' : ''
             },
             // Better paste handling
             transformPastedHTML(html) {
@@ -51,14 +54,9 @@ const TiptapEditor = ({ value, onChange, disabled }: TiptapEditorProps) => {
     })
 
     // Update editor content if external value changes (and isn't the same)
-    // This is tricky with Tiptap to avoid cursor jumps, but simple check helps
     React.useEffect(() => {
         if (editor && value !== editor.getHTML()) {
-            // Only set if completely empty or significantly different to avoid loops
-            // For simple forms, this might be okay, but ideally we check if focused.
             if (editor.getText() === '' && value === '') return;
-            // If the diff is just formatting, we might want to keep it, but efficient syncing is hard.
-            // For now, assume value is source of truth only on initial load or reset.
             if (editor.isEmpty && value) {
                 editor.commands.setContent(value)
             }
@@ -120,6 +118,17 @@ const TiptapEditor = ({ value, onChange, disabled }: TiptapEditorProps) => {
                 {/* Alignment */}
                 <Button
                     type="button"
+                    variant={editor.isActive({ textAlign: 'left' }) ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                    className="h-8 w-8 p-0"
+                    title="Rata Kiri"
+                    disabled={disabled}
+                >
+                    <AlignLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                    type="button"
                     variant={editor.isActive({ textAlign: 'center' }) ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => editor.chain().focus().setTextAlign('center').run()}
@@ -135,7 +144,7 @@ const TiptapEditor = ({ value, onChange, disabled }: TiptapEditorProps) => {
                     size="sm"
                     onClick={() => editor.chain().focus().setTextAlign('right').run()}
                     className="h-8 w-8 p-0"
-                    title="Rata Kanan (Default Arabic)"
+                    title="Rata Kanan"
                     disabled={disabled}
                 >
                     <AlignRight className="h-4 w-4" />

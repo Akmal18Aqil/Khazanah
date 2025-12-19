@@ -7,16 +7,16 @@ interface ArabicTextProps {
 }
 
 // Helper to convert English numerals to Arabic numerals
-const toArabicNumerals = (str: string) => {
+export const toArabicNumerals = (str: string) => {
     const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return str.replace(/[0-9]/g, (w) => arabicNumerals[+w]);
 };
 
 // Helper to remove Arabic diacritics (Tashkeel) including Tatweel
-const removeTashkeel = (str: string) => str.replace(/[\u0640\u064B-\u065F\u0670]/g, '');
+export const removeTashkeel = (str: string) => str.replace(/[\u0640\u064B-\u065F\u0670]/g, '');
 
 // Helper to generate flexible regex for Arabic highlighting
-const getHighlightRegex = (query: string) => {
+export const getHighlightRegex = (query: string) => {
     if (!query || query.trim() === '') return null;
 
     const arabicQuery = removeTashkeel(toArabicNumerals(query)).normalize('NFC');
