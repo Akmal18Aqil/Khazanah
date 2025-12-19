@@ -3,7 +3,8 @@
 import { getServerSession } from 'next-auth'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { fiqhEntrySchema, FiqhEntryValues } from '@/lib/schemas'
 
 export async function createEntry(data: FiqhEntryValues) {

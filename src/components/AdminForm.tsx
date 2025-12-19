@@ -18,6 +18,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import TiptapEditor from '@/components/TiptapEditor'
+import mammoth from 'mammoth'
+import { useToast } from '@/hooks/use-toast'
 import {
   Form,
   FormControl,
@@ -53,6 +55,7 @@ interface AdminFormProps {
 
 export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
 
@@ -63,13 +66,13 @@ export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
     answer_summary: entry?.answer_summary || '',
     ibarat_text: entry?.ibarat_text || '',
     musyawarah_source: entry?.musyawarah_source || '',
-    entry_type: entry?.entry_type || 'ibarat',
+    entry_type: entry?.entry_type || 'rumusan',
     source_books: entry?.source_books?.map(book => ({
       id: book.id,
       kitab_name: book.kitab_name,
       details: book.details || '',
       order_index: book.order_index
-    })) || [{ kitab_name: '', details: '', order_index: 0 }],
+    })),
   }
 
   const form = useForm<FiqhEntryValues>({
@@ -147,6 +150,135 @@ export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
           </p>
         </div>
       </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+        <div className="space-y-1">
+          <h3 className="font-semibold text-blue-800 flex items-center gap-2">
+            <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">Baru</span>
+            Import dari Word
+          </h3>
+          <p className="text-sm text-blue-600">
+            Isi form otomatis dengan mengupload file .docx (Pertanyaan, Jawaban, Ibarat, Sumber).
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a href="/TEMPLATE_IMPORT.md" target="_blank" className="text-xs text-blue-600 underline hover:text-blue-800 mr-2">
+            Lihat Format
+          </a>
+          <Input
+            type="file"
+            accept=".docx"
+            className="hidden"
+            id="word-upload"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+
+              const { dismiss } = toast({
+                title: "Membaca file Word...",
+                description: "Mohon tunggu sebentar.",
+              })
+
+              try {
+                const arrayBuffer = await file.arrayBuffer()
+                // Use extractRawText for better text extraction
+                const result = await mammoth.extractRawText({ arrayBuffer })
+                const text = result.value
+
+                console.log('Extracted text:', text)
+
+                // Simple keyword-based extraction
+                // We use regex to find content between headers
+                // Headers we look for:
+                // 1. Judul / Topik / Tema
+                // 2. Sumber / Penyelenggara / Keputusan
+                // 3. Pertanyaan / Deskripsi Masalah / Soal
+                // 4. Jawaban / Rumusan
+                // 5. Ibarat / Nash / Dasar Hukum
+
+                const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+                // Helper to split by rough sections based on keywords
+                // This is a naive implementation but works for structured docs
+                const keywords = [
+                  { key: 'title', patterns: ['judul', 'topik', 'tema'] },
+                  { key: 'musyawarah_source', patterns: ['sumber', 'penyelenggara', 'keputusan', 'hasil'] },
+                  { key: 'question_text', patterns: ['pertanyaan', 'deskripsimasalah', 'soal'] },
+                  { key: 'answer_summary', patterns: ['jawaban', 'rumusan'] },
+                  { key: 'ibarat_text', patterns: ['ibarat', 'nash', 'dasarhukum', 'referensi'] }
+                ]
+
+                // Split text into lines to process
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l)
+                console.log('Lines to process:', lines.length)
+
+                let currentKey: keyof FiqhEntryValues | null = null
+                const extracted: Partial<Record<keyof FiqhEntryValues, string[]>> = {}
+
+                for (const line of lines) {
+                  const lowerLine = normalize(line)
+                  let foundKey = false
+
+                  // Check if line is a header
+                  for (const { key, patterns } of keywords) {
+                    // Check if line contains keyword and is short enough to be a header
+                    // We also check if it starts with the keyword to avoid false positives in sentences
+                    if (patterns.some(p => lowerLine.includes(p) && lowerLine.length < 50)) {
+                      currentKey = key as keyof FiqhEntryValues
+                      foundKey = true
+                      console.log(`Found header: ${key} in line: "${line}"`)
+                      break
+                    }
+                  }
+
+                  if (!foundKey && currentKey) {
+                    if (!extracted[currentKey]) extracted[currentKey] = []
+                    extracted[currentKey]!.push(line)
+                  }
+                }
+
+                console.log('Extracted data:', extracted)
+
+                // Populate form
+                if (extracted.title) form.setValue('title', extracted.title.join(' '), { shouldDirty: true, shouldValidate: true })
+                if (extracted.musyawarah_source) form.setValue('musyawarah_source', extracted.musyawarah_source.join(' '), { shouldDirty: true, shouldValidate: true })
+                if (extracted.question_text) form.setValue('question_text', extracted.question_text.join('<br>'), { shouldDirty: true, shouldValidate: true })
+                if (extracted.answer_summary) form.setValue('answer_summary', extracted.answer_summary.join('\n'), { shouldDirty: true, shouldValidate: true })
+                if (extracted.ibarat_text) form.setValue('ibarat_text', extracted.ibarat_text.join('<br>'), { shouldDirty: true, shouldValidate: true })
+
+                dismiss()
+                toast({
+                  title: "Berhasil!",
+                  description: `Berhasil mengimport ${lines.length} baris data.`,
+                  variant: "default",
+                })
+              } catch (err) {
+                console.error(err)
+                dismiss()
+                toast({
+                  title: "Gagal",
+                  description: "Terjadi kesalahan saat membaca file Word.",
+                  variant: "destructive",
+                })
+              }
+
+              // Reset input
+              e.target.value = ''
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
+            onClick={() => {
+              document.getElementById('word-upload')?.click()
+            }}
+          >
+            Upload .docx
+          </Button>
+        </div>
+      </div>
+
 
       <Card>
         <CardHeader>

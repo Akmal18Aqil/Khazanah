@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import AdminForm from '@/components/AdminForm'
-import { supabaseAdmin } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 interface EditEntryPageProps {
   params: Promise<{ id: string }>

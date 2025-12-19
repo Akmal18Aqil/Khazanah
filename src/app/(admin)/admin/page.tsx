@@ -10,6 +10,7 @@ import { Loader2, Plus, Edit, Trash2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { AdminTableSkeleton } from '@/components/AdminTableSkeleton'
+import { supabase } from '@/lib/supabaseClient'
 
 interface FiqhEntry {
   id: string
@@ -32,6 +33,55 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchEntries(page)
   }, [page])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-entries')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fiqh_entries',
+        },
+        (payload) => {
+          console.log('Realtime payload received:', payload)
+          if (payload.eventType === 'INSERT') {
+            const newEntry = payload.new as FiqhEntry
+            setTotalEntries((prev) => prev + 1)
+
+            // Only add to list if we are on the first page
+            if (page === 1) {
+              setEntries((prev) => {
+                const exists = prev.find(e => e.id === newEntry.id)
+                if (exists) return prev
+                const updated = [newEntry, ...prev]
+                if (updated.length > limit) updated.pop() // Maintain limit
+                return updated
+              })
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldId = payload.old.id
+            setTotalEntries((prev) => Math.max(0, prev - 1))
+            setEntries((prev) => prev.filter((e) => e.id !== oldId))
+            // Ideally we should fetch the next item to fill the gap, but skipping for now
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedEntry = payload.new as FiqhEntry
+            console.log('Updating entry:', updatedEntry)
+            setEntries((prev) =>
+              prev.map((e) => (e.id === updatedEntry.id ? { ...e, ...updatedEntry } : e))
+            )
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Supabase Realtime Status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [page, limit])
 
   const fetchEntries = async (page: number) => {
     setIsLoading(true)
