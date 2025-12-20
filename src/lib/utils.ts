@@ -41,3 +41,19 @@ export function highlightText(text: string, query?: string): string {
   // I'll skip adding it to utils for now and just implement logical equivalent in FiqhCard.
   return text
 }
+
+export function normalizeArabic(text: string): string {
+  if (!text) return ""
+  return text
+    .replace(/([^\u0621-\u063A\u0641-\u064A\u0660-\u0669])/g, '') // Remove non-arabic chars if strict, or just remove tashkeel below
+    // Remove Tashkeel (Diacritics)
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    // Remove Tatweel
+    .replace(/[\u0640]/g, '')
+    // Normalize Aleph
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+  // Normalize Ya (Optional, sometimes Alif Maqsura \u0649 matches Ya \u064A)
+  // .replace(/[\u0649]/g, '\u064A') 
+  // Normalize Ta Marbuta to Ha (Optional)
+  // .replace(/[\u0629]/g, '\u0647')
+}
