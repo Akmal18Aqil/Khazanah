@@ -142,8 +142,8 @@
   margin-bottom: 0;
 }
 
-/* Arabic Text Preview Styles */
-.arabic-html p {
+/* Arabic Text (RTL) Preview Styles */
+.arabic-content p {
   margin-bottom: 1rem;
   line-height: 2;
   /* Relaxed leading for Arabic */
@@ -151,12 +151,31 @@
   /* Ensure empty paragraphs have height */
 }
 
-/* Ensure empty paragraphs are visible even if strict filtering removed &nbsp; */
-.arabic-html p:empty::before {
+/* Ensure empty paragraphs are visible */
+.arabic-content p:empty::before {
   content: "\00a0";
   display: inline-block;
 }
 
-.arabic-html p:last-child {
+.arabic-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Latin Text (LTR) Preview Styles */
+.latin-content p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+  /* Standard leading for Latin */
+  min-height: 1.6em;
+  /* Ensure empty paragraphs have height */
+}
+
+/* Ensure empty paragraphs are visible */
+.latin-content p:empty::before {
+  content: "\00a0";
+  display: inline-block;
+}
+
+.latin-content p:last-child {
   margin-bottom: 0;
 }

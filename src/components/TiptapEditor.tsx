@@ -193,39 +193,35 @@ const TiptapEditor = ({ value, onChange, disabled, mode = 'arabic' }: TiptapEdit
                     <AlignRight className="h-4 w-4" />
                 </Button>
 
-                {isMixed && (
-                    <>
-                        <div className="w-px h-4 bg-slate-300 mx-1" />
-                        <Button
-                            type="button"
-                            variant={editor.isActive({ dir: 'ltr' }) ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => {
-                                editor.chain().focus().setDirection('ltr').setTextAlign('left').run()
-                            }}
-                            className="h-8 w-8 p-0"
-                            title="Arah Teks LTR (Latin)"
-                            disabled={disabled}
-                        >
-                            <Languages className="h-4 w-4" />
-                            <span className="sr-only">LTR</span>
-                        </Button>
-                        <Button
-                            type="button"
-                            variant={editor.isActive({ dir: 'rtl' }) ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={() => {
-                                editor.chain().focus().setDirection('rtl').setTextAlign('right').run()
-                            }}
-                            className="h-8 w-8 p-0"
-                            title="Arah Teks RTL (Arab)"
-                            disabled={disabled}
-                        >
-                            <span className="font-arabic text-xs font-bold">ع</span>
-                            <span className="sr-only">RTL</span>
-                        </Button>
-                    </>
-                )}
+                <div className="w-px h-4 bg-slate-300 mx-1" />
+                <Button
+                    type="button"
+                    variant={editor.isActive({ dir: 'ltr' }) ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                        editor.chain().focus().setDirection('ltr').setTextAlign('left').run()
+                    }}
+                    className="h-8 w-8 p-0"
+                    title="Arah Teks LTR (Latin)"
+                    disabled={disabled}
+                >
+                    <Languages className="h-4 w-4" />
+                    <span className="sr-only">LTR</span>
+                </Button>
+                <Button
+                    type="button"
+                    variant={editor.isActive({ dir: 'rtl' }) ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                        editor.chain().focus().setDirection('rtl').setTextAlign('right').run()
+                    }}
+                    className="h-8 w-8 p-0"
+                    title="Arah Teks RTL (Arab)"
+                    disabled={disabled}
+                >
+                    <span className="font-arabic text-xs font-bold">ع</span>
+                    <span className="sr-only">RTL</span>
+                </Button>
 
                 <div className="w-px h-4 bg-slate-300 mx-1" />
 
@@ -266,4 +262,3 @@ const TiptapEditor = ({ value, onChange, disabled, mode = 'arabic' }: TiptapEdit
 }
 
 export default TiptapEditor
- 

@@ -117,9 +117,10 @@ export default async function EntryDetailPage({ params, searchParams }: EntryDet
                   <Users className="w-5 h-5" />
                   Pertanyaan
                 </h3>
-                <div
-                  className="leading-relaxed whitespace-pre-wrap prose max-w-none dark:prose-invert"
-                  dangerouslySetInnerHTML={{ __html: entryWithBooks.question_text }}
+                <ArabicText
+                  content={entryWithBooks.question_text}
+                  dir="ltr"
+                  className="leading-relaxed"
                 />
               </div>
             )}
@@ -127,9 +128,11 @@ export default async function EntryDetailPage({ params, searchParams }: EntryDet
             <div>
               <h3 className="font-semibold text-lg mb-2">Ringkasan Jawaban</h3>
               <div className="prose prose-gray max-w-none">
-                <p className="leading-relaxed whitespace-pre-wrap">
-                  {entryWithBooks.answer_summary}
-                </p>
+                <ArabicText
+                  content={entryWithBooks.answer_summary}
+                  dir="ltr"
+                  className="leading-relaxed"
+                />
               </div>
             </div>
 

@@ -59,25 +59,55 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight, 
 
     const decodedContent = unescapeHtml(content).normalize('NFC');
 
-    // ... existing highlight logic ...
+    // Helper: Wrap Arabic characters in a span with proper font styling
+    const wrapArabicContent = (text: string) => {
+        // Regex matches strictly Arabic characters (not spaces/punctuation used in Latin)
+        const arabicRegex = /([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)/g;
+
+        return text.split(arabicRegex).map((part) => {
+            // Check if part contains Arabic characters
+            if (/[\u0600-\u06FF]/.test(part)) {
+                return `<span class="font-arabic text-[1.15em] leading-[1.8]" dir="auto">${part}</span>`;
+            }
+            return part;
+        }).join('');
+    };
 
     // Helper to safely convert numerals and Highlight in HTML string
     // Moved inside to access highlight regex
     const processTextContent = (text: string) => {
-        const withNumerals = toArabicNumerals(text);
+        let processed = text;
 
-        if (!highlight || highlight.trim() === '') return withNumerals;
+        // 1. Numerals: Only convert to Arabic numerals if we are in RTL (Arabic) mode.
+        // In LTR (Indonesian/Mixed) mode, preserve Latin numerals (e.g. "Tahun 2024").
+        if (dir === 'rtl') {
+            processed = toArabicNumerals(processed);
+        }
+
+        // 2. Highlighting & Font Wrapping
+        if (!highlight || highlight.trim() === '') {
+            return wrapArabicContent(processed);
+        }
 
         const regexes = getHighlightRegex(highlight);
-        if (!regexes) return withNumerals;
+        if (!regexes) {
+            return wrapArabicContent(processed);
+        }
 
         const { loopRegex, checkRegex } = regexes;
 
-        return withNumerals.split(loopRegex).map(part =>
-            checkRegex.test(part)
-                ? `<span class="text-red-500 font-bold bg-yellow-100/50 dark:bg-yellow-900/30 rounded px-0.5">${part}</span>`
-                : part
-        ).join('');
+        return processed.split(loopRegex).map(part => {
+            if (checkRegex.test(part)) {
+                // Highlighted part
+                // Check if it needs Arabic font
+                const isArabic = /[\u0600-\u06FF]/.test(part);
+                const extraClasses = isArabic ? 'font-arabic text-[1.15em] leading-[1.8]' : '';
+                return `<span class="text-red-500 font-bold bg-yellow-100/50 dark:bg-yellow-900/30 rounded px-0.5 ${extraClasses}">${part}</span>`;
+            } else {
+                // Non-highlighted part: Smart wrap Arabic
+                return wrapArabicContent(part);
+            }
+        }).join('');
     };
 
     const convertHtmlContent = (html: string) => {
@@ -90,9 +120,12 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight, 
     const isHtml = /<\/?[a-z][\s\S]*>/i.test(decodedContent);
 
     if (isHtml) {
+        // Determine content class based on direction
+        const contentClass = dir === 'rtl' ? 'arabic-content' : 'latin-content';
+
         return (
             <div
-                className={`arabic-html prose dark:prose-invert max-w-none ${dir === 'rtl' ? 'text-right font-arabic leading-loose' : 'text-left font-sans'} text-lg ${className || ''}`}
+                className={`${contentClass} prose dark:prose-invert max-w-none ${dir === 'rtl' ? 'text-right font-arabic leading-loose' : 'text-left font-sans'} text-lg ${className || ''}`}
                 style={{ fontFamily: dir === 'rtl' ? 'var(--font-arabic)' : 'inherit', direction: dir === 'auto' ? 'inherit' : dir }}
                 dangerouslySetInnerHTML={{ __html: convertHtmlContent(decodedContent) }}
             />
