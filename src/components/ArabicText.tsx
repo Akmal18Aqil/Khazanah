@@ -4,6 +4,7 @@ interface ArabicTextProps {
     content: string;
     className?: string; // Allow passing extra classes
     highlight?: string;
+    dir?: 'ltr' | 'rtl' | 'auto';
 }
 
 // Helper to convert English numerals to Arabic numerals
@@ -43,7 +44,7 @@ export const getHighlightRegex = (query: string) => {
     };
 };
 
-const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight }) => {
+const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight, dir = 'rtl' }) => {
     if (!content) return null;
 
     // Helper to unescape HTML entities if they exist
@@ -58,7 +59,10 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight }
 
     const decodedContent = unescapeHtml(content).normalize('NFC');
 
-    // Helper to process text: Numerals -> Normalize -> Highlight
+    // ... existing highlight logic ...
+
+    // Helper to safely convert numerals and Highlight in HTML string
+    // Moved inside to access highlight regex
     const processTextContent = (text: string) => {
         const withNumerals = toArabicNumerals(text);
 
@@ -69,8 +73,6 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight }
 
         const { loopRegex, checkRegex } = regexes;
 
-        // We cannot return React Nodes here because this goes into dangerouslySetInnerHTML
-        // So we return raw HTML string for the highlight span
         return withNumerals.split(loopRegex).map(part =>
             checkRegex.test(part)
                 ? `<span class="text-red-500 font-bold bg-yellow-100/50 dark:bg-yellow-900/30 rounded px-0.5">${part}</span>`
@@ -78,24 +80,20 @@ const ArabicText: React.FC<ArabicTextProps> = ({ content, className, highlight }
         ).join('');
     };
 
-    // Helper to safely convert numerals and Highlight in HTML string
     const convertHtmlContent = (html: string) => {
-        // Regex to match text content: >text<
-        // This ensures we don't mess up attributes or tags
         return html.replace(/>([^<]+)</g, (match, textContent) => {
             return `>${processTextContent(textContent)}<`;
         });
     };
 
-    // Check if content looks like HTML (basic check)
-    // Tiptap usually wraps content in <p> or other tags.
+    // Check if content looks like HTML
     const isHtml = /<\/?[a-z][\s\S]*>/i.test(decodedContent);
 
     if (isHtml) {
         return (
             <div
-                className={`prose dark:prose-invert max-w-none text-right font-arabic leading-loose text-lg ${className || ''}`}
-                style={{ fontFamily: 'var(--font-arabic)', direction: 'rtl' }}
+                className={`arabic-html prose dark:prose-invert max-w-none ${dir === 'rtl' ? 'text-right font-arabic leading-loose' : 'text-left font-sans'} text-lg ${className || ''}`}
+                style={{ fontFamily: dir === 'rtl' ? 'var(--font-arabic)' : 'inherit', direction: dir === 'auto' ? 'inherit' : dir }}
                 dangerouslySetInnerHTML={{ __html: convertHtmlContent(decodedContent) }}
             />
         );

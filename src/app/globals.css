@@ -116,13 +116,47 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   .font-arabic {
     font-family: var(--font-arabic);
   }
+
   .rtl {
     direction: rtl;
   }
+}
+
+/* Tiptap Editor Custom Styles */
+.tiptap-editor .ProseMirror p {
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+  min-height: 1.6em;
+  /* Ensure empty paragraphs have height */
+}
+
+.tiptap-editor .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+/* Arabic Text Preview Styles */
+.arabic-html p {
+  margin-bottom: 1rem;
+  line-height: 2;
+  /* Relaxed leading for Arabic */
+  min-height: 2em;
+  /* Ensure empty paragraphs have height */
+}
+
+/* Ensure empty paragraphs are visible even if strict filtering removed &nbsp; */
+.arabic-html p:empty::before {
+  content: "\00a0";
+  display: inline-block;
+}
+
+.arabic-html p:last-child {
+  margin-bottom: 0;
 }

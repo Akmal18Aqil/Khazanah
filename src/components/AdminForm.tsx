@@ -369,11 +369,11 @@ export default function AdminForm({ entry, isEdit = false }: AdminFormProps) {
                       <FormItem>
                         <FormLabel>Ringkasan Jawaban *</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Teks jawaban/rumusan dalam Bahasa Indonesia"
-                            rows={6}
-                            {...field}
+                          <TiptapEditor
+                            value={field.value || ''}
+                            onChange={field.onChange}
                             disabled={isPending}
+                            mode="standard"
                           />
                         </FormControl>
                         <FormMessage />

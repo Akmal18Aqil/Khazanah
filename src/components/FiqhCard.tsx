@@ -156,9 +156,12 @@ export default function FiqhCard({ entry, searchQuery }: FiqhCardProps) {
             </h4>
 
             <div className={`prose prose-sm dark:prose-invert max-w-none text-foreground ${isExpanded ? "" : "line-clamp-3"}`}>
-              <p className="leading-relaxed">
-                {highlightText(isExpanded ? entry.answer_summary : getSnippet(entry.answer_summary, searchQuery), searchQuery)}
-              </p>
+              <ArabicText
+                content={isExpanded ? entry.answer_summary : getSnippet(entry.answer_summary, searchQuery)}
+                highlight={searchQuery}
+                dir="ltr"
+                className="leading-relaxed"
+              />
             </div>
           </div>
 

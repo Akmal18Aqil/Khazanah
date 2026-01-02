@@ -260,9 +260,10 @@ const TiptapEditor = ({ value, onChange, disabled, mode = 'arabic' }: TiptapEdit
                 </Button>
 
             </div>
-            <EditorContent editor={editor} className="p-2 min-h-[200px] outline-none" />
+            <EditorContent editor={editor} className="tiptap-editor p-2 min-h-[200px] outline-none" />
         </div>
     )
 }
 
 export default TiptapEditor
+ 
